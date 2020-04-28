@@ -18,7 +18,7 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         """Get minor key for each MTOM song.
         """
         keys = []
-        OCTAVE_NUM = 12
+        OCTAVE = 12
         RELATIVE_MINOR_ADJ = 3
 
         for s in midi_paths:
@@ -33,23 +33,42 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
             # pretty_midi minor keys are between 12 and 23,
             # and need to be adjusted so that they are between
             # 0 and 11, inclusive.
-            if key_num >= OCTAVE_NUM:
-                key_num -= OCTAVE_NUM
+            if key_num >= OCTAVE:
+                key_num -= OCTAVE
             # otherwise, key is in major, and needs
             # to be converted to relative minor key.
-            elif key_num < OCTAVE_NUM:
-                key_num = (key_num - RELATIVE_MINOR_ADJ) % OCTAVE_NUM
+            elif key_num < OCTAVE:
+                key_num = (key_num - RELATIVE_MINOR_ADJ) % OCTAVE
 
             print('song:', s)
-            print('key num:', key_num, 'key:', pm.key_number_to_key_name(key_num + OCTAVE_NUM), '\n')
+            print('key num:', key_num, 'key:', pm.key_number_to_key_name(key_num + OCTAVE), '\n')
             keys.append(key_num)
 
         return keys
 
     def get_six_seven_indices(self, all_events, keys):
         """
+        NOTE: make sure that I am using the MIDI files that do not have the
+        additional instrument parts!
         """
-        return []
+        six_seven_indices = []
+        SIXTH_INT = 8
+        SEVENTH_INT = 10
+        OCTAVE = 12
+
+        for key,events in zip(keys, all_events):
+            song_six_seven_indices = []
+            sixth_scale_degree = (key + SIXTH_INT) % OCTAVE
+            seventh_scale_degree = (key + SEVENTH_INT) % OCTAVE
+            for idx,e in enumerate(events):
+                if (e.name == 'Note On'
+                    and (e.value % OCTAVE == sixth_scale_degree
+                         or e.value % OCTAVE == seventh_scale_degree)):
+                    pdb.set_trace()
+                    song_six_seven_indices.append(idx)
+            six_seven_indices.append(song_six_seven_indices)
+
+        return six_seven_indices
 
     def convert_events_to_words(self, all_events):
         """event to word
