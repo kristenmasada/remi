@@ -1,12 +1,52 @@
-from model import PopMusicTransformer
-import numpy as np
+"""
+"""
+
 import pdb
+import re
+import sys
+
+import numpy as np
+import pretty_midi as pm
+
+from model import PopMusicTransformer
 
 class MajMinPopMusicTransformer(PopMusicTransformer):
     def __init__(self, checkpoint, is_training=False):
         PopMusicTransformer.__init__(self, checkpoint, is_training)
 
-    def get_six_seven_indices(self, all_events):
+    def get_keys(self, midi_paths):
+        """Get minor key for each MTOM song.
+        """
+        keys = []
+        OCTAVE_NUM = 12
+        RELATIVE_MINOR_ADJ = 3
+
+        for s in midi_paths:
+            parsed_s = pm.PrettyMIDI(s)
+            if len(parsed_s.key_signature_changes) > 0:
+                key_num = parsed_s.key_signature_changes[0].key_number
+            else:
+                print('pretty_midi could not find a key signature for {}'.format(s))
+                sys.exit(1)
+
+            # check if key_num corresponds to a minor key.
+            # pretty_midi minor keys are between 12 and 23,
+            # and need to be adjusted so that they are between
+            # 0 and 11, inclusive.
+            if key_num >= OCTAVE_NUM:
+                key_num -= OCTAVE_NUM
+            # otherwise, key is in major, and needs
+            # to be converted to relative minor key.
+            elif key_num < OCTAVE_NUM:
+                key_num = (key_num - RELATIVE_MINOR_ADJ) % OCTAVE_NUM
+
+            print('song:', s)
+            print('key num:', key_num, 'key:', pm.key_number_to_key_name(key_num + OCTAVE_NUM), '\n')
+            keys.append(key_num)
+
+        return keys
+
+    def get_six_seven_indices(self, all_events, keys):
         """
         """
         return []
@@ -28,6 +68,7 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
                         words.append(self.event2word['Note Velocity_21'])
                     else:
                         print('OOV event found: {}'.format(e))
+                        sys.exit(1)
             all_words.append(words)
 
         return all_words
@@ -35,14 +76,15 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
     def prepare_mtom_data(self, midi_paths):
         """
         """
+        keys = self.get_keys(midi_paths)
+
         # extract events
         all_events = []
         for path in midi_paths:
             events = self.extract_events(path)
             all_events.append(events)
 
-        # get indices of sixths and sevenths
-        six_seven_indices = get_six_seven_indices(all_events)
+        six_seven_indices = self.get_six_seven_indices(all_events, keys)
 
         all_words = self.convert_events_to_words(all_events)
 
