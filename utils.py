@@ -3,6 +3,8 @@ import numpy as np
 import miditoolkit
 import copy
 
+import pdb
+
 # parameters for input
 DEFAULT_VELOCITY_BINS = np.linspace(0, 128, 32+1, dtype=np.int)
 DEFAULT_FRACTION = 16
@@ -34,10 +36,10 @@ def read_items(file_path):
     notes.sort(key=lambda x: (x.start, x.pitch))
     for note in notes:
         note_items.append(Item(
-            name='Note', 
-            start=note.start, 
-            end=note.end, 
-            velocity=note.velocity, 
+            name='Note',
+            start=note.start,
+            end=note.end,
+            velocity=note.velocity,
             pitch=note.pitch))
     note_items.sort(key=lambda x: x.start)
     # tempo
@@ -83,7 +85,7 @@ def quantize_items(items, ticks=120):
         shift = grids[index] - item.start
         item.start += shift
         item.end += shift
-    return items      
+    return items
 
 # extract chord
 def extract_chords(items):
@@ -136,7 +138,7 @@ def item2event(groups):
         n_downbeat += 1
         events.append(Event(
             name='Bar',
-            time=None, 
+            time=None,
             value=None,
             text='{}'.format(n_downbeat)))
         for item in groups[i][1:-1]:
@@ -144,25 +146,25 @@ def item2event(groups):
             flags = np.linspace(bar_st, bar_et, DEFAULT_FRACTION, endpoint=False)
             index = np.argmin(abs(flags-item.start))
             events.append(Event(
-                name='Position', 
+                name='Position',
                 time=item.start,
                 value='{}/{}'.format(index+1, DEFAULT_FRACTION),
                 text='{}'.format(item.start)))
             if item.name == 'Note':
                 # velocity
                 velocity_index = np.searchsorted(
-                    DEFAULT_VELOCITY_BINS, 
-                    item.velocity, 
+                    DEFAULT_VELOCITY_BINS,
+                    item.velocity,
                     side='right') - 1
                 events.append(Event(
                     name='Note Velocity',
-                    time=item.start, 
+                    time=item.start,
                     value=velocity_index,
                     text='{}/{}'.format(item.velocity, DEFAULT_VELOCITY_BINS[velocity_index])))
                 # pitch
                 events.append(Event(
                     name='Note On',
-                    time=item.start, 
+                    time=item.start,
                     value=item.pitch,
                     text='{}'.format(item.pitch)))
                 # duration
@@ -175,7 +177,7 @@ def item2event(groups):
                     text='{}/{}'.format(duration, DEFAULT_DURATION_BINS[index])))
             elif item.name == 'Chord':
                 events.append(Event(
-                    name='Chord', 
+                    name='Chord',
                     time=item.start,
                     value=item.pitch,
                     text='{}'.format(item.pitch)))
@@ -183,15 +185,15 @@ def item2event(groups):
                 tempo = item.pitch
                 if tempo in DEFAULT_TEMPO_INTERVALS[0]:
                     tempo_style = Event('Tempo Class', item.start, 'slow', None)
-                    tempo_value = Event('Tempo Value', item.start, 
+                    tempo_value = Event('Tempo Value', item.start,
                         tempo-DEFAULT_TEMPO_INTERVALS[0].start, None)
                 elif tempo in DEFAULT_TEMPO_INTERVALS[1]:
                     tempo_style = Event('Tempo Class', item.start, 'mid', None)
-                    tempo_value = Event('Tempo Value', item.start, 
+                    tempo_value = Event('Tempo Value', item.start,
                         tempo-DEFAULT_TEMPO_INTERVALS[1].start, None)
                 elif tempo in DEFAULT_TEMPO_INTERVALS[2]:
                     tempo_style = Event('Tempo Class', item.start, 'fast', None)
-                    tempo_value = Event('Tempo Value', item.start, 
+                    tempo_value = Event('Tempo Value', item.start,
                         tempo-DEFAULT_TEMPO_INTERVALS[2].start, None)
                 elif tempo < DEFAULT_TEMPO_INTERVALS[0].start:
                     tempo_style = Event('Tempo Class', item.start, 'slow', None)
@@ -200,7 +202,7 @@ def item2event(groups):
                     tempo_style = Event('Tempo Class', item.start, 'fast', None)
                     tempo_value = Event('Tempo Value', item.start, 59, None)
                 events.append(tempo_style)
-                events.append(tempo_value)     
+                events.append(tempo_value)
     return events
 
 #############################################################################################

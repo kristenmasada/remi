@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import miditoolkit
 import modules
+import pdb
 import pickle
 import utils
 import time
@@ -187,7 +188,7 @@ class PopMusicTransformer(object):
             # sampling
             _logit = _logits[-1, 0]
             word = self.temperature_sampling(
-                logits=_logit, 
+                logits=_logit,
                 temperature=temperature)
             words[0].append(word)
             # if bar event (only work for batch_size=1)
