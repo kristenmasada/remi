@@ -174,7 +174,7 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
     def get_six_seven_indices(self, all_events, all_normal_six_seven_notes,
                               all_raised_six_seven_notes, midi_paths):
         """
-        NOTE: # of 6/7's found in EKNM is wrong. Come back to this later and fix it!
+        NOTE: # of 6/7's found in EKNM Solo is wrong. Come back to this later and fix it!
         """
         six_seven_indices = []
         for song_idx,events in enumerate(all_events):
@@ -256,6 +256,49 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
 
         return segments, six_seven_indices
 
-    def evaluate_mtom_67s(self, mtom_data):
+    def get_six_seven_prediction(self, logits, ss_idx, song_data):
+        """
+        """
+        normal_67_word = song_data[ss_idx]
+        normal_67_event = self.word2event[normal_67_word]
+        normal_67_pitch = int(normal_67_event.split("_")[-1])
+        raised_67_pitch = normal_67_pitch + 1
+        raised_67_event = "Note On_" + str(raised_67_pitch)
+        raised_67_word = self.event2word[raised_67_event]
+
+        normal_67_score = logits[normal_67_word]
+        raised_67_score = logits[raised_67_word]
+
+        if raised_67_score > normal_67_score:
+            return "raised"
+        elif raised_67_score <= normal_67_score:
+            return "normal"
+
+    def evaluate_mtom_67s(self, mtom_data, six_seven_indices):
+        """
+        """
         # initialize mem
         batch_m = [np.zeros((self.mem_len, self.batch_size, self.d_model), dtype=np.float32) for _ in range(self.n_layer)]
+
+        for song_data,ss_indices in zip(mtom_data, six_seven_indices):
+            for ss_idx in ss_indices:
+                words = [song_data[:ss_idx]]
+
+                words_length = len(words[0])
+                temp_x = np.zeros((self.batch_size, words_length))
+                for b in range(self.batch_size):
+                    for i,w in enumerate(words[b]):
+                        temp_x[b][i] = w
+
+                feed_dict = {self.x: temp_x}
+                for m, m_np in zip(self.mems_i, batch_m):
+                    feed_dict[m] = m_np
+
+                # model (predictiosn)
+                _logits, _new_mem = self.sess.run([self.logits, self.new_mem], feed_dict=feed_dict)
+                _logit = _logits[-1, 0]
+                ss_idx_event = self.word2event[song_data[ss_idx]]
+                six_seven_pred = self.get_six_seven_prediction(_logit, ss_idx, song_data)
+                print('six seven prediction:', six_seven_pred)
+
+                pdb.set_trace()

@@ -13,7 +13,7 @@ def main():
     #pdb.set_trace()
     mtom_data, \
     six_seven_indices = model.prepare_mtom_data(midi_paths=mtom_midi_paths, ticks=120)
-    model.evaluate_mtom_67s(mtom_data)
+    model.evaluate_mtom_67s(mtom_data, six_seven_indices)
 
     model.close()
 
