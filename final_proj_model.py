@@ -240,18 +240,6 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
 
         all_words = self.convert_events_to_words(all_events)
 
-        """
-        segments = []
-        for words in all_words:
-            song = []
-            for i in range(0, len(words), self.x_len):
-                x = words[i:i+self.x_len]
-                x = np.array(x)
-                song.append(x)
-            song = np.array(song)
-            segments.append(song)
-        segments = np.array(segments)
-        """
         segments = np.array(all_words)
 
         return segments, six_seven_indices
@@ -279,15 +267,19 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         """
         # initialize mem
         batch_m = [np.zeros((self.mem_len, self.batch_size, self.d_model), dtype=np.float32) for _ in range(self.n_layer)]
-
+        six_seven_preds = []
         for song_data,ss_indices in zip(mtom_data, six_seven_indices):
+            prev_ss_idx = 0
+            song_six_seven_preds = []
             for ss_idx in ss_indices:
-                words = [song_data[:ss_idx]]
+                words = song_data[prev_ss_idx:ss_idx]
+                words_length = len(words)
 
-                words_length = len(words[0])
+                # NOTE: what if words is longer than self.x_len?
+                # Need to break it up?
                 temp_x = np.zeros((self.batch_size, words_length))
                 for b in range(self.batch_size):
-                    for i,w in enumerate(words[b]):
+                    for i,w in enumerate(words):
                         temp_x[b][i] = w
 
                 feed_dict = {self.x: temp_x}
@@ -299,6 +291,15 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
                 _logit = _logits[-1, 0]
                 ss_idx_event = self.word2event[song_data[ss_idx]]
                 six_seven_pred = self.get_six_seven_prediction(_logit, ss_idx, song_data)
-                print('six seven prediction:', six_seven_pred)
+                song_six_seven_preds.append(six_seven_pred)
+                #print('pred:', six_seven_pred)
 
-                pdb.set_trace()
+                # NOTE: should I update the 6/7 with the configuration the
+                # model predicted?
+                prev_ss_idx = ss_idx
+                batch_m = _new_mem
+            six_seven_preds.append(song_six_seven_preds)
+
+        print('done!')
+
+        return six_seven_preds
