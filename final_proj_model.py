@@ -112,6 +112,17 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
 
         return tempo_items
 
+    def get_six_seven_note_indices(self, note_items, six_seven_note_items):
+        """
+        """
+        six_seven_indices = []
+        for n_idx,n in enumerate(note_items):
+            for s_n in six_seven_note_items:
+                if (n.start == s_n.start
+                    and n.pitch == s_n.pitch):
+                    six_seven_indices.append(n_idx)
+        return six_seven_indices
+
     def mtom_read_items(self, file_path):
         """
         """
@@ -140,7 +151,13 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         raised_six_seven_note_items, \
         tempo_items = self.mtom_read_items(input_path)
 
+        normal_six_seven_note_indices = self.get_six_seven_note_indices(note_items, normal_six_seven_note_items)
+        raised_six_seven_note_indices = self.get_six_seven_note_indices(note_items, raised_six_seven_note_items)
+
         note_items = utils.quantize_items(note_items, ticks)
+
+        normal_six_seven_note_items = [note_items[idx] for idx in normal_six_seven_note_indices]
+        raised_six_seven_note_items = [note_items[idx] for idx in raised_six_seven_note_indices]
 
         max_time = note_items[-1].end
         if 'chord' in self.checkpoint_path:
@@ -152,88 +169,31 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         groups = utils.group_items(items, max_time)
         events = utils.item2event(groups)
 
-        if normal_six_seven_note_items:
-            normal_six_seven_note_items = utils.quantize_items(normal_six_seven_note_items, ticks)
-            normal_max_time = normal_six_seven_note_items[-1].end
-            normal_six_seven_groups = utils.group_items(normal_six_seven_note_items, normal_max_time)
-            normal_events = utils.item2event(normal_six_seven_groups)
+        return events, normal_six_seven_note_items, raised_six_seven_note_items
 
-        else:
-            normal_events = []
-
-        if raised_six_seven_note_items:
-            raised_six_seven_note_items = utils.quantize_items(raised_six_seven_note_items, ticks)
-            raised_max_time = raised_six_seven_note_items[-1].end
-            raised_six_seven_groups = utils.group_items(normal_six_seven_note_items, raised_max_time)
-            raised_events = utils.item2event(raised_six_seven_groups)
-        else:
-            raised_events = []
-
-        return events, normal_events, raised_events
-
-    def get_keys(self, midi_paths):
-        """Get minor key for each MTOM song.
+    def get_six_seven_indices(self, all_events, all_normal_six_seven_notes,
+                              all_raised_six_seven_notes, midi_paths):
         """
-        keys = []
-        OCTAVE = 12
-        RELATIVE_MINOR_ADJ = 3
-
-        for s in midi_paths:
-            parsed_s = pm.PrettyMIDI(s)
-            if len(parsed_s.key_signature_changes) > 0:
-                key_num = parsed_s.key_signature_changes[0].key_number
-            else:
-                print('pretty_midi could not find a key signature for {}'.format(s))
-                sys.exit(1)
-
-            # check if key_num corresponds to a minor key.
-            # pretty_midi minor keys are between 12 and 23,
-            # and need to be adjusted so that they are between
-            # 0 and 11, inclusive.
-            if key_num >= OCTAVE:
-                key_num -= OCTAVE
-            # otherwise, key is in major, and needs
-            # to be converted to relative minor key.
-            elif key_num < OCTAVE:
-                key_num = (key_num - RELATIVE_MINOR_ADJ) % OCTAVE
-
-            print('song:', s)
-            print('key num:', key_num, 'key:', pm.key_number_to_key_name(key_num + OCTAVE), '\n')
-            keys.append(key_num)
-
-        return keys
-
-    def get_six_seven_indices(self, all_events, all_normal_six_seven_events,
-                              all_raised_six_seven_events, midi_paths):
-        """
-        NOTE: make sure that I am using the MIDI files that do not have the
-        additional instrument parts!
-        """
-        pdb.set_trace()
+        NOTE: # of 6/7's found in EKNM is wrong. Come back to this later and fix it!
         """
         six_seven_indices = []
-        SIXTH_INT = 8
-        SEVENTH_INT = 10
-        OCTAVE = 12
-        song_idx = 0
-
-        for key,events in zip(keys, all_events):
+        for song_idx,events in enumerate(all_events):
+            song_six_seven_notes = all_normal_six_seven_notes[song_idx] + all_raised_six_seven_notes[song_idx]
+            song_six_seven_notes.sort(key=lambda x: x.start)
             song_six_seven_indices = []
-            sixth_scale_degree = (key + SIXTH_INT) % OCTAVE
-            seventh_scale_degree = (key + SEVENTH_INT) % OCTAVE
-            for idx,e in enumerate(events):
-                if (e.name == 'Note On'
-                    and (e.value % OCTAVE == sixth_scale_degree
-                         or e.value % OCTAVE == seventh_scale_degree)):
-                    #print('note:', pm.note_number_to_name(e.value))
-                    song_six_seven_indices.append(idx)
+            for event_idx,event in enumerate(events):
+                if event.name == 'Note On':
+                    for six_seven in song_six_seven_notes[:]:
+                        if (event.value == six_seven.pitch
+                            and event.time == six_seven.start):
+                            song_six_seven_notes.remove(six_seven)
+                            song_six_seven_indices.append(event_idx)
+                            break
+
             six_seven_indices.append(song_six_seven_indices)
+            #print('song:', midi_paths[song_idx], 'num 67s found:', len(song_six_seven_indices))
 
-            print('song', midi_paths[song_idx], '# 6/7 indices:', len(song_six_seven_indices))
-            song_idx += 1
-        """
-
-        return []
+        return six_seven_indices
 
     def convert_events_to_words(self, all_events):
         """event to word
@@ -260,7 +220,6 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
     def prepare_mtom_data(self, midi_paths, ticks):
         """
         """
-        #keys = self.get_keys(midi_paths)
 
         # extract events
         all_events = []
@@ -281,6 +240,7 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
 
         all_words = self.convert_events_to_words(all_events)
 
+        """
         segments = []
         for words in all_words:
             song = []
@@ -291,6 +251,8 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
             song = np.array(song)
             segments.append(song)
         segments = np.array(segments)
+        """
+        segments = np.array(all_words)
 
         return segments, six_seven_indices
 
