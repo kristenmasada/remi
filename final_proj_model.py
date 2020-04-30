@@ -177,23 +177,33 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         NOTE: # of 6/7's found in EKNM Solo is wrong. Come back to this later and fix it!
         """
         six_seven_indices = []
+        six_seven_labels = []
         for song_idx,events in enumerate(all_events):
-            song_six_seven_notes = all_normal_six_seven_notes[song_idx] + all_raised_six_seven_notes[song_idx]
-            song_six_seven_notes.sort(key=lambda x: x.start)
+            song_normal_six_seven_notes = all_normal_six_seven_notes[song_idx]
+            song_raised_six_seven_notes = all_raised_six_seven_notes[song_idx]
             song_six_seven_indices = []
+            song_six_seven_labels = []
             for event_idx,event in enumerate(events):
                 if event.name == 'Note On':
-                    for six_seven in song_six_seven_notes[:]:
+                    for six_seven in song_normal_six_seven_notes[:]:
                         if (event.value == six_seven.pitch
                             and event.time == six_seven.start):
-                            song_six_seven_notes.remove(six_seven)
+                            song_normal_six_seven_notes.remove(six_seven)
                             song_six_seven_indices.append(event_idx)
+                            song_six_seven_labels.append("normal")
                             break
-
+                    for six_seven in song_raised_six_seven_notes[:]:
+                        if (event.value == six_seven.pitch
+                            and event.time == six_seven.start):
+                            song_raised_six_seven_notes.remove(six_seven)
+                            song_six_seven_indices.append(event_idx)
+                            song_six_seven_labels.append("raised")
+                            break
             six_seven_indices.append(song_six_seven_indices)
+            six_seven_labels.append(song_six_seven_labels)
             #print('song:', midi_paths[song_idx], 'num 67s found:', len(song_six_seven_indices))
 
-        return six_seven_indices
+        return six_seven_indices, six_seven_labels
 
     def convert_events_to_words(self, all_events):
         """event to word
@@ -221,7 +231,6 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         """
         """
 
-        # extract events
         all_events = []
         all_normal_six_seven_events = []
         all_raised_six_seven_events = []
@@ -233,16 +242,17 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
             all_normal_six_seven_events.append(normal_six_seven_events)
             all_raised_six_seven_events.append(raised_six_seven_events)
 
-        six_seven_indices = self.get_six_seven_indices(all_events,
-                                                       all_normal_six_seven_events,
-                                                       all_raised_six_seven_events,
-                                                       midi_paths)
+        six_seven_indices, \
+        six_seven_labels = self.get_six_seven_indices(all_events,
+                                                      all_normal_six_seven_events,
+                                                      all_raised_six_seven_events,
+                                                      midi_paths)
 
         all_words = self.convert_events_to_words(all_events)
 
         segments = np.array(all_words)
 
-        return segments, six_seven_indices
+        return segments, six_seven_indices, six_seven_labels
 
     def get_six_seven_prediction(self, logits, ss_idx, song_data):
         """
@@ -303,3 +313,24 @@ class MajMinPopMusicTransformer(PopMusicTransformer):
         print('done!')
 
         return six_seven_preds
+
+    def compute_mtom_67_acc(self, six_seven_preds, six_seven_labels, midi_paths):
+        """
+        """
+        song_idx = 0
+        correct = 0
+        total = 0
+        for song_preds,song_labels in zip(six_seven_preds, six_seven_labels):
+            song_correct = 0
+            song_total = len(song_labels)
+            for p,l in zip(song_preds, song_labels):
+                if p == l:
+                    song_correct += 1
+            song_acc = song_correct / song_total
+            print('song:', midi_paths[song_idx])
+            print('acc: {:.2f}%'.format(song_acc * 100.0))
+            correct += song_correct
+            total += song_total
+            song_idx += 1
+        overall_acc = correct / total
+        print('overall acc: {:.2f}%'.format(overall_acc * 100.0))
