@@ -224,18 +224,19 @@ class PopMusicTransformer(object):
         for events in all_events:
             words = []
             for event in events:
-                e = '{}_{}'.format(event.name, event.value)
-                if e in self.event2word:
-                    words.append(self.event2word[e])
-                else:
-                    # OOV
-                    if event.name == 'Note Velocity':
-                        # replace with max velocity based on our training data
-                        words.append(self.event2word['Note Velocity_21'])
+                if event is not None:
+                    e = '{}_{}'.format(event.name, event.value)
+                    if e in self.event2word:
+                        words.append(self.event2word[e])
                     else:
-                        # something is wrong
-                        # you should handle it for your own purpose
-                        print('something is wrong! {}'.format(e))
+                        # OOV
+                        if event.name == 'Note Velocity':
+                            # replace with max velocity based on our training data
+                            words.append(self.event2word['Note Velocity_21'])
+                        else:
+                            # something is wrong
+                            # you should handle it for your own purpose
+                            print('something is wrong! {}'.format(e))
             all_words.append(words)
         # to training data
         self.group_size = 5

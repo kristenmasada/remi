@@ -183,6 +183,7 @@ def item2event(groups):
                     text='{}'.format(item.pitch)))
             elif item.name == 'Tempo':
                 tempo = item.pitch
+                tempo_style, tempo_value = None, None
                 if tempo in DEFAULT_TEMPO_INTERVALS[0]:
                     tempo_style = Event('Tempo Class', item.start, 'slow', None)
                     tempo_value = Event('Tempo Value', item.start,
@@ -201,8 +202,10 @@ def item2event(groups):
                 elif tempo > DEFAULT_TEMPO_INTERVALS[2].stop:
                     tempo_style = Event('Tempo Class', item.start, 'fast', None)
                     tempo_value = Event('Tempo Value', item.start, 59, None)
-                events.append(tempo_style)
-                events.append(tempo_value)
+                if tempo_style is not None:
+                    events.append(tempo_style)
+                if tempo_value is not None:
+                    events.append(tempo_value)
     return events
 
 #############################################################################################
